@@ -277,6 +277,15 @@
   .ref-one-fark b{color:var(--koruk)}
   .ref-kategori{max-width:1000px;margin:0 auto 32px}
   .ref-kat-baslik{font-size:18px;color:var(--bordo);margin-bottom:16px;padding-bottom:8px;border-bottom:2px solid var(--krem2)}
+  .hava-cek{display:flex;gap:10px;margin-bottom:8px}
+  .hava-cek select{flex:1;padding:11px 14px;border-radius:10px;border:1.5px solid var(--krem2);
+      font-size:14px;font-family:inherit;background:#fff;color:var(--koyu)}
+  .hava-cek button{padding:11px 16px;border-radius:10px;border:none;background:var(--asma);color:#fff;
+      font-size:13.5px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap;transition:.2s}
+  .hava-cek button:hover{background:var(--asma2)}
+  .hava-cek button:disabled{opacity:.6;cursor:wait}
+  .hava-durum{font-size:13px;color:var(--asma);min-height:18px;margin-bottom:18px;font-weight:600}
+  .hava-durum.hata{color:#a02020}
 </style>
 </head>
 <body>
@@ -505,6 +514,20 @@
       <div class="tool-in">
         <h3>Saha Verileri</h3>
         <p class="sub">Suyabakan sensörlerinden ve tuzaktan gelecek veriler</p>
+        <div class="hava-cek">
+          <select id="sehir">
+            <option value="39.93,32.85">Ankara</option>
+            <option value="38.61,27.42">Manisa</option>
+            <option value="38.42,27.14">İzmir</option>
+            <option value="37.77,29.09">Denizli</option>
+            <option value="40.98,27.51">Tekirdağ</option>
+            <option value="38.35,38.31">Malatya</option>
+            <option value="37.91,40.24">Diyarbakır</option>
+            <option value="38.68,39.22">Elazığ</option>
+          </select>
+          <button type="button" onclick="havaCek()">🌦️ Gerçek Havayı Çek</button>
+        </div>
+        <p class="hava-durum" id="havaDurum"></p>
         <div class="field">
           <label>Üzüm Türü</label>
           <select id="uzumTipi" onchange="hesapla()">
@@ -1120,6 +1143,51 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape')kapat()});
 
 // ===== KARAR ARACI =====
 const esikler={sofralik:35,saraplik:55,kurutmalik:45};
+// ===== GERÇEK HAVA VERİSİ ÇEKME (Open-Meteo API) =====
+// "async" = bu fonksiyon internetten veri bekleyecek demek
+async function havaCek(){
+  const btn = event.target;               // basılan buton
+  const durum = document.getElementById('havaDurum');  // mesaj alanı
+  // seçili şehrin koordinatlarını al (örn "39.93,32.85")
+  const secim = document.getElementById('sehir').value;
+  const sehirAdi = document.getElementById('sehir').selectedOptions[0].text;
+  const [enlem, boylam] = secim.split(',');  // virgülden böl → enlem ve boylam
+
+  // kullanıcıya "bekle" mesajı göster
+  durum.classList.remove('hata');
+  durum.textContent = sehirAdi + ' için veri çekiliyor...';
+  btn.disabled = true;  // butonu geçici kapat (çift tıklama olmasın)
+
+  try {
+    // API adresini hazırla (koordinatları yerleştir)
+    const adres = 'https://api.open-meteo.com/v1/forecast?latitude=' + enlem +
+                  '&longitude=' + boylam +
+                  '&current=temperature_2m,relative_humidity_2m,rain';
+    // "await" = veri gelene kadar bekle
+    const cevap = await fetch(adres);       // API'ye istek gönder
+    const veri = await cevap.json();        // gelen cevabı JSON'a çevir
+    const su = veri.current;                // "current" = şu anki veriler
+
+    // gelen değerleri slider'lara yaz
+    const sic = Math.round(su.temperature_2m);
+    const nem = Math.round(su.relative_humidity_2m);
+    const yagis = Math.round(su.rain);
+
+    document.getElementById('sicaklik').value = Math.min(40, Math.max(0, sic));
+    document.getElementById('nem').value = Math.min(100, Math.max(20, nem));
+    document.getElementById('yagis').value = Math.min(40, Math.max(0, yagis));
+
+    hesapla();  // slider'lar değişti, riski yeniden hesapla
+
+    durum.textContent = '✓ ' + sehirAdi + ': ' + sic + '°C, %' + nem + ' nem, ' + yagis + ' mm yağış';
+  } catch (e) {
+    // internet yoksa veya bir hata olursa buraya düşer
+    durum.classList.add('hata');
+    durum.textContent = 'Veri çekilemedi. İnternet bağlantısını kontrol et.';
+  }
+  btn.disabled = false;  // butonu tekrar aç
+}
+
 function hesapla(){
   const tip=document.getElementById('uzumTipi').value;
   const bocek=+document.getElementById('bocek').value;
